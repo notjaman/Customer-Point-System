@@ -6,8 +6,8 @@ export interface Customer {
   points: number;
   points_redeemed: number; // Track total points spent
   created_at: string;
-  tier?: 'Standard' | 'Gold' | 'Platinum';
+  tier?: 'standard' | 'gold' | 'platinum';
 }
 
 export type SortOption = 'name-asc' | 'name-desc' | 'points-high' | 'points-low' | 'newest';
-export type TierFilter = 'All' | 'Standard' | 'Gold' | 'Platinum';
+export type TierFilter = 'All' | 'standard' | 'gold' | 'platinum';

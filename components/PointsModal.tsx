@@ -11,12 +11,22 @@ interface PointsModalProps {
 const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }) => {
   const [amount, setAmount] = useState<number>(0);
   const [type, setType] = useState<'add' | 'subtract'>('add');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalAmount = type === 'add' ? amount : -amount;
-    onUpdate(customer.id, finalAmount);
-    onClose();
+    if (amount <= 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      const finalAmount = type === 'add' ? amount : -amount;
+      await onUpdate(customer.id, finalAmount);
+      onClose();
+    } catch (error) {
+      console.error('Points update error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -73,9 +83,9 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
               <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-300 pointer-events-none tracking-widest uppercase">Points</span>
             </div>
             <p className="text-[10px] text-slate-400 font-bold mt-3">
-              Customer Balance: <span className="text-indigo-600">{customer.points.toLocaleString()}</span> → 
+              Customer Balance: <span className="text-indigo-600">{(customer.points || 0).toLocaleString()}</span> → 
               <span className={type === 'add' ? 'text-indigo-600' : 'text-rose-600'}>
-                {' '}{(type === 'add' ? customer.points + amount : customer.points - amount).toLocaleString()}
+                {' '}{(type === 'add' ? (customer.points || 0) + amount : (customer.points || 0) - amount).toLocaleString()}
               </span>
             </p>
           </div>
@@ -83,13 +93,23 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
           <div className="pt-2">
             <button
               type="submit"
-              className={`w-full py-5 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-[0.98] ${
-                type === 'add' 
-                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' 
-                  : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
+              disabled={amount <= 0 || isSubmitting}
+              className={`w-full py-5 font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-[0.98] ${
+                amount <= 0 || isSubmitting
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : type === 'add' 
+                    ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 text-white' 
+                    : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white'
               }`}
             >
-              Confirm Transaction
+              {isSubmitting ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Processing...
+                </div>
+              ) : (
+                'Confirm Transaction'
+              )}
             </button>
           </div>
         </form>

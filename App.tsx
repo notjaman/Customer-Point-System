@@ -3,10 +3,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import CustomerForm from './components/CustomerForm';
 import PointsModal from './components/PointsModal';
-import { db } from './services/supabase';
+import Notification, { NotificationType } from './components/Notification';
+import ConfirmDialog from './components/ConfirmDialog';
+import { db, calculateTier, supabase } from './services/supabase';
 import { Customer, SortOption, TierFilter } from './types';
 
 type Tab = 'dashboard' | 'customers';
+
+interface NotificationState {
+  type: NotificationType;
+  title: string;
+  message: string;
+}
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -16,6 +24,15 @@ const App: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [pointsAdjustmentCustomer, setPointsAdjustmentCustomer] = useState<Customer | null>(null);
+  
+  // Notification state
+  const [notification, setNotification] = useState<NotificationState | null>(null);
+  
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    customer: Customer | null;
+  }>({ isOpen: false, customer: null });
 
   // Sorting and Filtering State
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -25,29 +42,114 @@ const App: React.FC = () => {
     fetchCustomers();
   }, []);
 
+  const showNotification = (type: NotificationType, title: string, message: string) => {
+    setNotification({ type, title, message });
+  };
+
+  const hideNotification = () => {
+    setNotification(null);
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
   const fetchCustomers = async () => {
-    setLoading(true);
-    const data = await db.getCustomers();
-    setCustomers(data);
-    setLoading(false);
+    try {
+      setLoading(true);
+      
+      // Test Supabase connection first
+      console.log('Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('customers')
+        .select('count', { count: 'exact' });
+      
+      if (testError) {
+        console.error('Supabase connection test failed:', testError);
+        showNotification('error', 'Database Connection Failed', 'Please check your Supabase configuration and ensure the customers table exists.');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Supabase connection successful, customer count:', testData);
+      
+      const data = await db.getCustomers();
+      setCustomers(data);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      showNotification('error', 'Failed to Load', 'Could not fetch customer data. Please check your database setup.');
+      console.error('Error fetching customers:', error);
+    }
   };
 
   const handleSaveCustomer = async (name: string, phone: string, points: number, id?: string) => {
-    if (id) {
-      setCustomers(prev => prev.map(c => c.id === id ? { ...c, name, phone, points } : c));
-    } else {
-      const newCust = await db.addCustomer({ name, phone, points });
-      setCustomers(prev => [newCust, ...prev]);
+    try {
+      if (id) {
+        // Update existing customer
+        const updated = await db.updateCustomer(id, { name, phone, points });
+        if (updated) {
+          setCustomers(prev => prev.map(c => c.id === id ? updated : c));
+          showNotification('success', 'Customer Updated', `${name}'s details have been updated successfully.`);
+        } else {
+          throw new Error('Failed to update customer');
+        }
+      } else {
+        // Add new customer
+        const newCust = await db.addCustomer({ name, phone, points });
+        setCustomers(prev => [newCust, ...prev]);
+        showNotification('success', 'Customer Added', `${name} has been added to your loyalty program.`);
+      }
+      setEditingCustomer(null);
+      setIsFormOpen(false);
+    } catch (error) {
+      showNotification('error', 'Save Failed', 'Could not save customer details. Please try again.');
+      console.error('Error saving customer:', error);
     }
-    setEditingCustomer(null);
-    setIsFormOpen(false);
   };
 
   const handleUpdatePoints = async (id: string, amount: number) => {
-    const updated = await db.updatePoints(id, amount);
-    if (updated) {
-      setCustomers(prev => prev.map(c => c.id === id ? updated : c));
+    try {
+      const updated = await db.updatePoints(id, amount);
+      if (updated) {
+        setCustomers(prev => prev.map(c => c.id === id ? updated : c));
+        const action = amount > 0 ? 'added' : 'redeemed';
+        const absAmount = Math.abs(amount);
+        showNotification('success', 'Points Updated', `${absAmount} points ${action} successfully.`);
+      } else {
+        throw new Error('Failed to update points');
+      }
+    } catch (error) {
+      showNotification('error', 'Update Failed', 'Could not update points. Please try again.');
+      console.error('Error updating points:', error);
     }
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    setDeleteConfirm({ isOpen: true, customer });
+  };
+
+  const confirmDeleteCustomer = async () => {
+    if (!deleteConfirm.customer) return;
+    
+    try {
+      const success = await db.deleteCustomer(deleteConfirm.customer.id);
+      if (success) {
+        setCustomers(prev => prev.filter(c => c.id !== deleteConfirm.customer!.id));
+        showNotification('success', 'Customer Deleted', `${deleteConfirm.customer.name} has been removed from your system.`);
+      } else {
+        throw new Error('Failed to delete customer');
+      }
+    } catch (error) {
+      showNotification('error', 'Delete Failed', 'Could not delete customer. Please try again.');
+      console.error('Error deleting customer:', error);
+    } finally {
+      setDeleteConfirm({ isOpen: false, customer: null });
+    }
+  };
+
+  const cancelDeleteCustomer = () => {
+    setDeleteConfirm({ isOpen: false, customer: null });
   };
 
   const filteredAndSortedCustomers = useMemo(() => {
@@ -62,7 +164,7 @@ const App: React.FC = () => {
 
     if (tierFilter !== 'All') {
       result = result.filter(c => {
-        const tier = c.points > 5000 ? 'Platinum' : c.points > 1000 ? 'Gold' : 'Standard';
+        const tier = calculateTier(c.points || 0);
         return tier === tierFilter;
       });
     }
@@ -71,8 +173,8 @@ const App: React.FC = () => {
       switch (sortBy) {
         case 'name-asc': return a.name.localeCompare(b.name);
         case 'name-desc': return b.name.localeCompare(a.name);
-        case 'points-high': return b.points - a.points;
-        case 'points-low': return a.points - b.points;
+        case 'points-high': return (b.points || 0) - (a.points || 0);
+        case 'points-low': return (a.points || 0) - (b.points || 0);
         case 'newest': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         default: return 0;
       }
@@ -82,8 +184,21 @@ const App: React.FC = () => {
   }, [customers, searchQuery, sortBy, tierFilter]);
 
   const stats = useMemo(() => {
-    const totalPoints = customers.reduce((acc, c) => acc + c.points, 0);
+    const totalPoints = customers.reduce((acc, c) => acc + (c.points || 0), 0);
     const totalRedeemed = customers.reduce((acc, c) => acc + (c.points_redeemed || 0), 0);
+    
+    // Debug logging to check data
+    console.log('Stats calculation:', {
+      totalCustomers: customers.length,
+      totalPoints,
+      totalRedeemed,
+      sampleCustomer: customers[0] ? {
+        name: customers[0].name,
+        points: customers[0].points,
+        points_redeemed: customers[0].points_redeemed
+      } : null
+    });
+    
     return {
       totalCustomers: customers.length,
       totalPoints,
@@ -96,24 +211,15 @@ const App: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <p className="text-slate-500 text-sm font-medium">Total Customers</p>
-          <div className="flex items-end justify-between mt-2">
-            <h4 className="text-3xl font-bold text-slate-800">{stats.totalCustomers}</h4>
-            <span className="text-emerald-500 text-sm font-bold">+12% vs last month</span>
-          </div>
+          <h4 className="text-3xl font-bold text-slate-800 mt-2">{stats.totalCustomers}</h4>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <p className="text-slate-500 text-sm font-medium">Total Points Issued</p>
-          <div className="flex items-end justify-between mt-2">
-            <h4 className="text-3xl font-bold text-slate-800">{stats.totalPoints.toLocaleString()}</h4>
-            <span className="text-indigo-500 text-sm font-bold">Points Economy</span>
-          </div>
+          <h4 className="text-3xl font-bold text-slate-800 mt-2">{stats.totalPoints.toLocaleString()}</h4>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <p className="text-slate-500 text-sm font-medium">Total Points Redeemed</p>
-          <div className="flex items-end justify-between mt-2">
-            <h4 className="text-3xl font-bold text-slate-800">{stats.totalRedeemed.toLocaleString()}</h4>
-            <span className="text-rose-500 text-sm font-bold">Value Claimed</span>
-          </div>
+          <h4 className="text-3xl font-bold text-slate-800 mt-2">{stats.totalRedeemed.toLocaleString()}</h4>
         </div>
       </div>
 
@@ -121,7 +227,7 @@ const App: React.FC = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 min-w-0">
           <h3 className="text-lg font-bold text-slate-800 mb-6">Top Members</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...customers].sort((a,b) => b.points - a.points).slice(0, 6).map((c, i) => (
+            {[...customers].sort((a,b) => (b.points || 0) - (a.points || 0)).slice(0, 6).map((c, i) => (
               <div key={c.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${
@@ -135,7 +241,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-indigo-600">{c.points.toLocaleString()}</p>
+                  <p className="font-bold text-indigo-600">{(c.points || 0).toLocaleString()}</p>
                   <p className="text-[10px] uppercase font-bold text-slate-400">Pts</p>
                 </div>
               </div>
@@ -171,7 +277,7 @@ const App: React.FC = () => {
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-white rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mr-2">Tiers:</span>
-          {(['All', 'Standard', 'Gold', 'Platinum'] as TierFilter[]).map((tier) => (
+          {(['All', 'standard', 'gold', 'platinum'] as TierFilter[]).map((tier) => (
             <button
               key={tier}
               onClick={() => setTierFilter(tier)}
@@ -181,7 +287,7 @@ const App: React.FC = () => {
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
             >
-              {tier}
+              {tier === 'All' ? 'All' : tier.charAt(0).toUpperCase() + tier.slice(1)}
             </button>
           ))}
         </div>
@@ -231,26 +337,39 @@ const App: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-slate-600 font-medium">{c.phone}</td>
                   <td className="px-6 py-4">
-                    <span className="font-bold text-indigo-600 text-lg">{c.points.toLocaleString()}</span>
+                    <span className="font-bold text-indigo-600 text-lg">{(c.points || 0).toLocaleString()}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="font-bold text-rose-500 text-lg">{c.points_redeemed?.toLocaleString() || 0}</span>
+                    <span className="font-bold text-rose-500 text-lg">
+                      {(c.points_redeemed || 0).toLocaleString()}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${
-                      c.points > 5000 ? 'bg-indigo-100 text-indigo-700' : 
-                      c.points > 1000 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                      calculateTier(c.points || 0) === 'platinum' ? 'bg-indigo-100 text-indigo-700' : 
+                      calculateTier(c.points || 0) === 'gold' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                     }`}>
-                      {c.points > 5000 ? 'Platinum' : c.points > 1000 ? 'Gold' : 'Standard'}
+                      {(c.tier || calculateTier(c.points || 0)).charAt(0).toUpperCase() + (c.tier || calculateTier(c.points || 0)).slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setPointsAdjustmentCustomer(c); }}
-                      className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md"
-                    >
-                      Point Adjust
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPointsAdjustmentCustomer(c); }}
+                        className="px-3 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md"
+                      >
+                        Point Adjust
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCustomer(c); }}
+                        className="px-3 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-md"
+                        title="Delete Customer"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -302,6 +421,28 @@ const App: React.FC = () => {
           onUpdate={handleUpdatePoints}
         />
       )}
+
+      {/* Notification */}
+      {notification && (
+        <Notification
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          onClose={hideNotification}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Customer"
+        message={`Are you sure you want to delete ${deleteConfirm.customer?.name}? This action cannot be undone and will permanently remove all their data including points history.`}
+        confirmText="Delete Customer"
+        cancelText="Keep Customer"
+        onConfirm={confirmDeleteCustomer}
+        onCancel={cancelDeleteCustomer}
+        type="danger"
+      />
     </Layout>
   );
 };
