@@ -11,3 +11,11 @@ export interface Customer {
 
 export type SortOption = 'name-asc' | 'name-desc' | 'points-high' | 'points-low' | 'newest';
 export type TierFilter = 'All' | 'standard' | 'gold' | 'platinum';
+
+export interface AuditLog {
+  id: string;
+  action_type: 'customer_created' | 'customer_updated' | 'customer_deleted' | 'points_added' | 'points_redeemed';
+  customer_id: string | null;
+  customer_name: string;
+  created_at: string;
+}

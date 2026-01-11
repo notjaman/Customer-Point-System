@@ -5,10 +5,11 @@ import CustomerForm from './components/CustomerForm';
 import PointsModal from './components/PointsModal';
 import Notification, { NotificationType } from './components/Notification';
 import ConfirmDialog from './components/ConfirmDialog';
+import AuditLogViewer from './components/AuditLogViewer';
 import { db, calculateTier, supabase } from './services/supabase';
 import { Customer, SortOption, TierFilter } from './types';
 
-type Tab = 'dashboard' | 'customers';
+type Tab = 'dashboard' | 'customers' | 'audit';
 
 interface NotificationState {
   type: NotificationType;
@@ -252,7 +253,17 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderCustomers = () => (
+  const renderAuditLog = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <h2 className="text-xl font-bold text-slate-800 mb-4">System Activity Log</h2>
+        <p className="text-slate-600 text-sm mb-6">
+          Track all admin actions including customer management, points adjustments, and system changes.
+        </p>
+        <AuditLogViewer limit={100} />
+      </div>
+    </div>
+  );
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
@@ -400,6 +411,7 @@ const App: React.FC = () => {
         <>
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'customers' && renderCustomers()}
+          {activeTab === 'audit' && renderAuditLog()}
         </>
       )}
 

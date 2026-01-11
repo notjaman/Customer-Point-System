@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Customer } from '../types';
+import { Customer, AuditLog } from '../types';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -37,6 +37,52 @@ export const calculateTier = (points: number): 'standard' | 'gold' | 'platinum' 
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Audit logging helper functions
+class AuditLogger {
+  private static async logAction(
+    actionType: AuditLog['action_type'],
+    customerId: string | null,
+    customerName: string
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('audit_logs')
+        .insert([{
+          action_type: actionType,
+          customer_id: customerId,
+          customer_name: customerName
+        }]);
+
+      if (error) {
+        console.error('Failed to log audit action:', error);
+      }
+    } catch (error) {
+      console.error('Audit logging error:', error);
+    }
+  }
+
+  static async logCustomerCreated(customer: Customer): Promise<void> {
+    await this.logAction('customer_created', customer.id, customer.name);
+  }
+
+  static async logCustomerUpdated(customerId: string, customerName: string): Promise<void> {
+    await this.logAction('customer_updated', customerId, customerName);
+  }
+
+  static async logCustomerDeleted(customer: Customer): Promise<void> {
+    await this.logAction('customer_deleted', customer.id, customer.name);
+  }
+
+  static async logPointsAdded(customerId: string, customerName: string): Promise<void> {
+    await this.logAction('points_added', customerId, customerName);
+  }
+
+  static async logPointsRedeemed(customerId: string, customerName: string): Promise<void> {
+    await this.logAction('points_redeemed', customerId, customerName);
+  }
+}
+
 class SupabaseDB {
   async getCustomers(): Promise<Customer[]> {
     try {
@@ -102,6 +148,10 @@ class SupabaseDB {
       }
 
       console.log('✅ Successfully added customer:', data);
+      
+      // Log the audit trail
+      await AuditLogger.logCustomerCreated(data);
+      
       return data;
     } catch (error) {
       console.error('💥 Failed to add customer:', error);
@@ -122,6 +172,9 @@ class SupabaseDB {
         console.error('Error updating customer:', error);
         throw error;
       }
+
+      // Log the audit trail
+      await AuditLogger.logCustomerUpdated(id, data.name);
 
       return data;
     } catch (error) {
@@ -168,6 +221,13 @@ class SupabaseDB {
         throw error;
       }
 
+      // Log points adjustment
+      if (amount > 0) {
+        await AuditLogger.logPointsAdded(id, data.name);
+      } else {
+        await AuditLogger.logPointsRedeemed(id, data.name);
+      }
+
       return data;
     } catch (error) {
       console.error('Failed to update points:', error);
@@ -177,6 +237,18 @@ class SupabaseDB {
 
   async deleteCustomer(id: string): Promise<boolean> {
     try {
+      // Get customer data before deletion for audit logging
+      const { data: customerToDelete, error: fetchError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !customerToDelete) {
+        console.error('Error fetching customer for deletion:', fetchError);
+        return false;
+      }
+
       const { error } = await supabase
         .from('customers')
         .delete()
@@ -186,6 +258,9 @@ class SupabaseDB {
         console.error('Error deleting customer:', error);
         throw error;
       }
+
+      // Log the deletion
+      await AuditLogger.logCustomerDeleted(customerToDelete);
 
       return true;
     } catch (error) {
@@ -210,6 +285,68 @@ class SupabaseDB {
       return data || [];
     } catch (error) {
       console.error('Failed to search customers:', error);
+      return [];
+    }
+  }
+
+  // Audit log methods
+  async getAuditLogs(limit: number = 50): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch audit logs:', error);
+      return [];
+    }
+  }
+
+  async getCustomerAuditLogs(customerId: string): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching customer audit logs:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch customer audit logs:', error);
+      return [];
+    }
+  }
+
+  async getAuditLogsByAction(actionType: AuditLog['action_type'], limit: number = 50): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('action_type', actionType)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching audit logs by action:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch audit logs by action:', error);
       return [];
     }
   }
