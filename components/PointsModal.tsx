@@ -80,7 +80,7 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
             </p>
           </div>
 
-          <div className="pt-2 space-y-3">
+          <div className="pt-2">
             <button
               type="submit"
               className={`w-full py-5 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-[0.98] ${
@@ -90,13 +90,6 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
               }`}
             >
               Confirm Transaction
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all"
-            >
-              Cancel & Return to Dashboard
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 {
-  "name": "lumina-rewards---smart-customer-loyalty-system",
+  "name": "giant-sports-customer-loyalty-system",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "react": "^19.2.3",
-    "@google/genai": "^1.35.0",
-    "react-dom": "^19.2.3",
-    "recharts": "^3.6.0"
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

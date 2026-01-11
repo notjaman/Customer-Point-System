@@ -7,15 +7,15 @@
  * for a real Supabase client.
  */
 
-import { Customer, Transaction } from '../types';
+import { Customer } from '../types';
 
 // Mock Storage to ensure the app works immediately
 class MockDB {
   private customers: Customer[] = [
-    { id: '1', name: 'Alice Johnson', phone: '555-0101', points: 1250, points_redeemed: 500, created_at: new Date().toISOString() },
-    { id: '2', name: 'Bob Smith', phone: '555-0102', points: 450, points_redeemed: 150, created_at: new Date().toISOString() },
-    { id: '3', name: 'Charlie Davis', phone: '555-0103', points: 8900, points_redeemed: 4200, created_at: new Date().toISOString() },
-    { id: '4', name: 'Diana Prince', phone: '555-0104', points: 300, points_redeemed: 0, created_at: new Date().toISOString() },
+    { id: '1', name: 'Alice Johnson', phone: '+60 12-345 6789', points: 1250, points_redeemed: 500, created_at: new Date().toISOString() },
+    { id: '2', name: 'Bob Smith', phone: '+60 11-234 5678', points: 450, points_redeemed: 150, created_at: new Date().toISOString() },
+    { id: '3', name: 'Charlie Davis', phone: '+60 13-456 7890', points: 8900, points_redeemed: 4200, created_at: new Date().toISOString() },
+    { id: '4', name: 'Diana Prince', phone: '+60 14-567 8901', points: 300, points_redeemed: 0, created_at: new Date().toISOString() },
   ];
 
   async getCustomers(): Promise<Customer[]> {

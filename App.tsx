@@ -249,7 +249,7 @@ const App: React.FC = () => {
                       onClick={(e) => { e.stopPropagation(); setPointsAdjustmentCustomer(c); }}
                       className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md"
                     >
-                      Quick Adjust
+                      Point Adjust
                     </button>
                   </td>
                 </tr>
@@ -297,7 +297,7 @@ const App: React.FC = () => {
           customer={pointsAdjustmentCustomer}
           onClose={() => {
             setPointsAdjustmentCustomer(null);
-            setActiveTab('dashboard');
+            setActiveTab('customers');
           }}
           onUpdate={handleUpdatePoints}
         />
