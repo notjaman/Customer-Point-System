@@ -28,10 +28,10 @@ const TIER_THRESHOLDS = {
 
 // Helper function to calculate tier based on points
 export const calculateTier = (points: number): 'standard' | 'gold' | 'platinum' => {
-  const tier = points >= TIER_THRESHOLDS.PLATINUM ? 'platinum' : 
-               points >= TIER_THRESHOLDS.GOLD ? 'gold' : 
-               'standard';
-  
+  const tier = points >= TIER_THRESHOLDS.PLATINUM ? 'platinum' :
+    points >= TIER_THRESHOLDS.GOLD ? 'gold' :
+      'standard';
+
   console.log(`Calculating tier for ${points} points: ${tier}`);
   return tier;
 };
@@ -43,7 +43,8 @@ class AuditLogger {
   private static async logAction(
     actionType: AuditLog['action_type'],
     customerId: string | null,
-    customerName: string
+    customerName: string,
+    pointsChange?: number
   ): Promise<void> {
     try {
       const { error } = await supabase
@@ -51,7 +52,8 @@ class AuditLogger {
         .insert([{
           action_type: actionType,
           customer_id: customerId,
-          customer_name: customerName
+          customer_name: customerName,
+          points_change: pointsChange
         }]);
 
       if (error) {
@@ -74,12 +76,12 @@ class AuditLogger {
     await this.logAction('customer_deleted', customer.id, customer.name);
   }
 
-  static async logPointsAdded(customerId: string, customerName: string): Promise<void> {
-    await this.logAction('points_added', customerId, customerName);
+  static async logPointsAdded(customerId: string, customerName: string, amount: number): Promise<void> {
+    await this.logAction('points_added', customerId, customerName, amount);
   }
 
-  static async logPointsRedeemed(customerId: string, customerName: string): Promise<void> {
-    await this.logAction('points_redeemed', customerId, customerName);
+  static async logPointsRedeemed(customerId: string, customerName: string, amount: number): Promise<void> {
+    await this.logAction('points_redeemed', customerId, customerName, amount);
   }
 }
 
@@ -98,7 +100,7 @@ class SupabaseDB {
 
       // Debug logging to check what data we're getting
       console.log('Fetched customers from Supabase:', data?.slice(0, 2));
-      
+
       return data || [];
     } catch (error) {
       console.error('Failed to fetch customers:', error);
@@ -110,7 +112,7 @@ class SupabaseDB {
     try {
       const points = customer.points || 0;
       const tier = calculateTier(points);
-      
+
       const newCustomer = {
         name: customer.name.trim(),
         phone: customer.phone.trim(),
@@ -148,10 +150,10 @@ class SupabaseDB {
       }
 
       console.log('✅ Successfully added customer:', data);
-      
+
       // Log the audit trail
       await AuditLogger.logCustomerCreated(data);
-      
+
       return data;
     } catch (error) {
       console.error('💥 Failed to add customer:', error);
@@ -199,7 +201,7 @@ class SupabaseDB {
 
       // Calculate new values
       const newPoints = currentCustomer.points + amount;
-      const newPointsRedeemed = amount < 0 
+      const newPointsRedeemed = amount < 0
         ? (currentCustomer.points_redeemed || 0) + Math.abs(amount)
         : currentCustomer.points_redeemed || 0;
       const newTier = calculateTier(newPoints);
@@ -223,9 +225,9 @@ class SupabaseDB {
 
       // Log points adjustment
       if (amount > 0) {
-        await AuditLogger.logPointsAdded(id, data.name);
+        await AuditLogger.logPointsAdded(id, data.name, amount);
       } else {
-        await AuditLogger.logPointsRedeemed(id, data.name);
+        await AuditLogger.logPointsRedeemed(id, data.name, amount);
       }
 
       return data;

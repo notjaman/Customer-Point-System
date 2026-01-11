@@ -17,5 +17,6 @@ export interface AuditLog {
   action_type: 'customer_created' | 'customer_updated' | 'customer_deleted' | 'points_added' | 'points_redeemed';
   customer_id: string | null;
   customer_name: string;
+  points_change?: number;
   created_at: string;
 }

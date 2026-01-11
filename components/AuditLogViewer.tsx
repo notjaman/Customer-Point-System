@@ -8,10 +8,10 @@ interface AuditLogViewerProps {
   limit?: number;
 }
 
-const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ 
-  customerId, 
-  actionType, 
-  limit = 50 
+const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
+  customerId,
+  actionType,
+  limit = 50
 }) => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,9 +25,9 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       let logs: AuditLog[];
-      
+
       if (customerId) {
         logs = await db.getCustomerAuditLogs(customerId);
       } else if (actionType) {
@@ -35,7 +35,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
       } else {
         logs = await db.getAuditLogs(limit);
       }
-      
+
       setAuditLogs(logs);
     } catch (err) {
       console.error('Failed to load audit logs:', err);
@@ -99,7 +99,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-600">{error}</p>
-        <button 
+        <button
           onClick={loadAuditLogs}
           className="mt-2 text-red-600 hover:text-red-800 underline"
         >
@@ -123,7 +123,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
         <h3 className="text-lg font-semibold text-gray-900">
           Audit Log {customerId ? '(Customer Specific)' : ''}
         </h3>
-        <button 
+        <button
           onClick={loadAuditLogs}
           className="text-blue-600 hover:text-blue-800 text-sm"
         >
@@ -137,7 +137,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
             <div key={log.id} className="border-b border-gray-200 p-4 hover:bg-gray-50">
               <div className="flex items-start space-x-3">
                 <span className="text-2xl">{getActionIcon(log.action_type)}</span>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <p className={`text-sm font-medium ${getActionColor(log.action_type)}`}>
@@ -147,9 +147,14 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
                       {formatDate(log.created_at)}
                     </p>
                   </div>
-                  
+
                   <p className="text-sm text-gray-900 mt-1">
                     <strong>{log.customer_name}</strong>
+                    {log.points_change !== undefined && (
+                      <span className={`ml-2 font-bold ${log.points_change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ({log.points_change > 0 ? '+' : ''}{log.points_change} pts)
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

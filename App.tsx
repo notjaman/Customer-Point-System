@@ -25,10 +25,10 @@ const App: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [pointsAdjustmentCustomer, setPointsAdjustmentCustomer] = useState<Customer | null>(null);
-  
+
   // Notification state
   const [notification, setNotification] = useState<NotificationState | null>(null);
-  
+
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -58,22 +58,22 @@ const App: React.FC = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      
+
       // Test Supabase connection first
       console.log('Testing Supabase connection...');
       const { data: testData, error: testError } = await supabase
         .from('customers')
         .select('count', { count: 'exact' });
-      
+
       if (testError) {
         console.error('Supabase connection test failed:', testError);
         showNotification('error', 'Database Connection Failed', 'Please check your Supabase configuration and ensure the customers table exists.');
         setLoading(false);
         return;
       }
-      
+
       console.log('Supabase connection successful, customer count:', testData);
-      
+
       const data = await db.getCustomers();
       setCustomers(data);
       setLoading(false);
@@ -132,7 +132,7 @@ const App: React.FC = () => {
 
   const confirmDeleteCustomer = async () => {
     if (!deleteConfirm.customer) return;
-    
+
     try {
       const success = await db.deleteCustomer(deleteConfirm.customer.id);
       if (success) {
@@ -158,7 +158,7 @@ const App: React.FC = () => {
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(c => 
+      result = result.filter(c =>
         c.name.toLowerCase().includes(q) || c.phone.includes(q)
       );
     }
@@ -187,7 +187,7 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const totalPoints = customers.reduce((acc, c) => acc + (c.points || 0), 0);
     const totalRedeemed = customers.reduce((acc, c) => acc + (c.points_redeemed || 0), 0);
-    
+
     // Debug logging to check data
     console.log('Stats calculation:', {
       totalCustomers: customers.length,
@@ -199,7 +199,7 @@ const App: React.FC = () => {
         points_redeemed: customers[0].points_redeemed
       } : null
     });
-    
+
     return {
       totalCustomers: customers.length,
       totalPoints,
@@ -228,12 +228,11 @@ const App: React.FC = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 min-w-0">
           <h3 className="text-lg font-bold text-slate-800 mb-6">Top Members</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...customers].sort((a,b) => (b.points || 0) - (a.points || 0)).slice(0, 6).map((c, i) => (
+            {[...customers].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 6).map((c, i) => (
               <div key={c.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${
-                    i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-400' : 'bg-indigo-400'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-400' : 'bg-indigo-400'
+                    }`}>
                     {i + 1}
                   </div>
                   <div className="truncate">
@@ -264,10 +263,12 @@ const App: React.FC = () => {
       </div>
     </div>
   );
+
+  const renderCustomers = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input
             type="text"
             placeholder="Search by name or phone..."
@@ -280,7 +281,7 @@ const App: React.FC = () => {
           onClick={() => { setEditingCustomer(null); setIsFormOpen(true); }}
           className="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
           Add Customer
         </button>
       </div>
@@ -292,20 +293,19 @@ const App: React.FC = () => {
             <button
               key={tier}
               onClick={() => setTierFilter(tier)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                tierFilter === tier 
-                ? 'bg-indigo-600 text-white shadow-md' 
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${tierFilter === tier
+                ? 'bg-indigo-600 text-white shadow-md'
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
+                }`}
             >
               {tier === 'All' ? 'All' : tier.charAt(0).toUpperCase() + tier.slice(1)}
             </button>
           ))}
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-auto">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sort:</span>
-          <select 
+          <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
@@ -356,10 +356,9 @@ const App: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${
-                      calculateTier(c.points || 0) === 'platinum' ? 'bg-indigo-100 text-indigo-700' : 
+                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${calculateTier(c.points || 0) === 'platinum' ? 'bg-indigo-100 text-indigo-700' :
                       calculateTier(c.points || 0) === 'gold' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}>
+                      }`}>
                       {(c.tier || calculateTier(c.points || 0)).charAt(0).toUpperCase() + (c.tier || calculateTier(c.points || 0)).slice(1)}
                     </span>
                   </td>
@@ -377,7 +376,7 @@ const App: React.FC = () => {
                         title="Delete Customer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </div>
@@ -390,7 +389,7 @@ const App: React.FC = () => {
         {filteredAndSortedCustomers.length === 0 && (
           <div className="p-20 text-center">
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
             <p className="text-xl font-bold text-slate-400">No results found</p>
             <p className="text-sm text-slate-400">Try adjusting your filters or search query.</p>
