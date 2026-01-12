@@ -47,20 +47,32 @@ class AuditLogger {
     pointsChange?: number
   ): Promise<void> {
     try {
-      const { error } = await supabase
+      // Ensure customerId is either a valid string or null (not undefined or empty string)
+      const sanitizedCustomerId = (customerId && customerId.trim() !== '') ? customerId : null;
+
+      const { data, error } = await supabase
         .from('audit_logs')
         .insert([{
           action_type: actionType,
-          customer_id: customerId,
+          customer_id: sanitizedCustomerId,
           customer_name: customerName,
           points_change: pointsChange
-        }]);
+        }])
+        .select();
 
       if (error) {
-        console.error('Failed to log audit action:', error);
+        console.error('❌ Failed to log audit action:', {
+          error: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          sentData: { actionType, sanitizedCustomerId, customerName }
+        });
+      } else {
+        console.log('✅ Audit log created successfully:', data?.[0]?.id);
       }
     } catch (error) {
-      console.error('Audit logging error:', error);
+      console.error('💥 Audit logging exception:', error);
     }
   }
 
@@ -108,8 +120,39 @@ class SupabaseDB {
     }
   }
 
+  async checkPhoneExists(phone: string, excludeId?: string): Promise<boolean> {
+    try {
+      let query = supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', phone.trim());
+
+      if (excludeId) {
+        query = query.neq('id', excludeId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+        console.error('Error checking phone uniqueness:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Failed to check phone uniqueness:', error);
+      return false;
+    }
+  }
+
   async addCustomer(customer: Omit<Customer, 'id' | 'created_at' | 'points_redeemed' | 'tier'>): Promise<Customer> {
     try {
+      // Check for uniqueness manually for better error messages
+      const exists = await this.checkPhoneExists(customer.phone);
+      if (exists) {
+        throw new Error('DUPLICATE_PHONE');
+      }
+
       const points = customer.points || 0;
       const tier = calculateTier(points);
 
@@ -153,6 +196,9 @@ class SupabaseDB {
 
       // Log the audit trail
       await AuditLogger.logCustomerCreated(data);
+      if (data.points > 0) {
+        await AuditLogger.logPointsAdded(data.id, data.name, data.points);
+      }
 
       return data;
     } catch (error) {
@@ -163,6 +209,14 @@ class SupabaseDB {
 
   async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer | null> {
     try {
+      // If phone is being updated, check for uniqueness
+      if (updates.phone) {
+        const exists = await this.checkPhoneExists(updates.phone, id);
+        if (exists) {
+          throw new Error('DUPLICATE_PHONE');
+        }
+      }
+
       const { data, error } = await supabase
         .from('customers')
         .update(updates)
@@ -251,6 +305,10 @@ class SupabaseDB {
         return false;
       }
 
+      // Log the deletion BEFORE deleting the customer
+      // This ensures the customer_id (FK) still exists if the database has strict constraints
+      await AuditLogger.logCustomerDeleted(customerToDelete);
+
       const { error } = await supabase
         .from('customers')
         .delete()
@@ -260,9 +318,6 @@ class SupabaseDB {
         console.error('Error deleting customer:', error);
         throw error;
       }
-
-      // Log the deletion
-      await AuditLogger.logCustomerDeleted(customerToDelete);
 
       return true;
     } catch (error) {

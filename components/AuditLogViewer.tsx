@@ -131,8 +131,8 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="max-h-96 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow">
+        <div>
           {auditLogs.map((log) => (
             <div key={log.id} className="border-b border-gray-200 p-4 hover:bg-gray-50">
               <div className="flex items-start space-x-3">
@@ -142,6 +142,12 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
                   <div className="flex items-center justify-between">
                     <p className={`text-sm font-medium ${getActionColor(log.action_type)}`}>
                       {formatActionType(log.action_type)}
+                      {(log.action_type === 'points_added' || log.action_type === 'points_redeemed') &&
+                        log.points_change !== undefined && log.points_change !== null && (
+                          <span className="ml-1 font-bold">
+                            ({log.points_change > 0 ? '+' : ''}{log.points_change} pts)
+                          </span>
+                        )}
                     </p>
                     <p className="text-xs text-gray-500">
                       {formatDate(log.created_at)}
@@ -150,11 +156,6 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
 
                   <p className="text-sm text-gray-900 mt-1">
                     <strong>{log.customer_name}</strong>
-                    {log.points_change !== undefined && (
-                      <span className={`ml-2 font-bold ${log.points_change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ({log.points_change > 0 ? '+' : ''}{log.points_change} pts)
-                      </span>
-                    )}
                   </p>
                 </div>
               </div>

@@ -20,3 +20,4 @@ export interface AuditLog {
   points_change?: number;
   created_at: string;
 }
+export const REFERRAL_BONUS_POINTS = 50;
