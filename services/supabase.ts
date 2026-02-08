@@ -253,6 +253,24 @@ class SupabaseDB {
         return null;
       }
 
+      // Validate redemption (negative amounts)
+      if (amount < 0) {
+        const absAmount = Math.abs(amount);
+
+        // Import validation function
+        const { isValidRedemption, POINTS_PER_REDEMPTION } = await import('../types');
+
+        // Check if redemption is in valid increments
+        if (!isValidRedemption(absAmount)) {
+          throw new Error(`INVALID_REDEMPTION_INCREMENT: Redemption amount must be in multiples of ${POINTS_PER_REDEMPTION} points`);
+        }
+
+        // Check if customer has enough points
+        if (currentCustomer.points < absAmount) {
+          throw new Error(`INSUFFICIENT_POINTS: Customer has ${currentCustomer.points} points but tried to redeem ${absAmount} points`);
+        }
+      }
+
       // Calculate new values
       const newPoints = currentCustomer.points + amount;
       const newPointsRedeemed = amount < 0
@@ -287,7 +305,7 @@ class SupabaseDB {
       return data;
     } catch (error) {
       console.error('Failed to update points:', error);
-      return null;
+      throw error; // Re-throw to allow caller to handle specific errors
     }
   }
 
@@ -405,6 +423,51 @@ class SupabaseDB {
     } catch (error) {
       console.error('Failed to fetch audit logs by action:', error);
       return [];
+    }
+  }
+
+  // Get total points redeemed today
+  async getTotalRedeemedToday(): Promise<number> {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('points_change')
+        .eq('action_type', 'points_redeemed')
+        .gte('created_at', todayISO);
+
+      if (error) {
+        console.error('Error fetching today\'s redemptions:', error);
+        return 0;
+      }
+
+      // Sum up all the points (they're negative, so we take absolute values)
+      const total = data?.reduce((sum, log) => sum + Math.abs(log.points_change || 0), 0) || 0;
+      return total;
+    } catch (error) {
+      console.error('Failed to get total redeemed today:', error);
+      return 0;
+    }
+  }
+
+  // Check if redemption threshold has been reached
+  async checkRedemptionThreshold(): Promise<{ exceeded: boolean; totalPoints: number; totalRM: number }> {
+    try {
+      const { REDEMPTION_THRESHOLD, convertPointsToRM } = await import('../types');
+      const totalPoints = await this.getTotalRedeemedToday();
+      const totalRM = convertPointsToRM(totalPoints);
+
+      return {
+        exceeded: totalPoints >= REDEMPTION_THRESHOLD.dailyPoints,
+        totalPoints,
+        totalRM
+      };
+    } catch (error) {
+      console.error('Failed to check redemption threshold:', error);
+      return { exceeded: false, totalPoints: 0, totalRM: 0 };
     }
   }
 }

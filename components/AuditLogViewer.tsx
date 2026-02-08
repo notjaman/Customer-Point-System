@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AuditLog } from '../types';
+import { AuditLog, convertPointsToRM, formatRM } from '../types';
 import { db } from '../services/supabase';
 
 interface AuditLogViewerProps {
@@ -190,7 +190,13 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
                         {(log.action_type === 'points_added' || log.action_type === 'points_redeemed') &&
                           log.points_change !== undefined && log.points_change !== null && (
                             <span className="ml-1 font-bold">
-                              ({log.points_change > 0 ? '+' : ''}{log.points_change} pts)
+                              ({log.points_change > 0 ? '+' : ''}{log.points_change} pts
+                              {log.action_type === 'points_redeemed' && (
+                                <span className="ml-1 text-green-600">
+                                  = {formatRM(convertPointsToRM(Math.abs(log.points_change)))}
+                                </span>
+                              )}
+                              )
                             </span>
                           )}
                       </p>

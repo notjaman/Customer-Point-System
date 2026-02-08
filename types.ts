@@ -21,3 +21,27 @@ export interface AuditLog {
   created_at: string;
 }
 export const REFERRAL_BONUS_POINTS = 50;
+
+// Redemption System Constants
+export const POINTS_PER_REDEMPTION = 500;
+export const RM_PER_REDEMPTION = 10;
+export const POINTS_TO_RM_RATE = RM_PER_REDEMPTION / POINTS_PER_REDEMPTION; // 0.02
+
+// Redemption threshold for admin notifications (daily)
+export const REDEMPTION_THRESHOLD = {
+  dailyPoints: 5000,  // Notify when 5000+ points redeemed today
+  dailyRM: 100,       // Equivalent to RM 100
+};
+
+// Utility Functions
+export const convertPointsToRM = (points: number): number => {
+  return points * POINTS_TO_RM_RATE;
+};
+
+export const isValidRedemption = (points: number): boolean => {
+  return points > 0 && points % POINTS_PER_REDEMPTION === 0;
+};
+
+export const formatRM = (amount: number): string => {
+  return `RM ${amount.toFixed(2)}`;
+};

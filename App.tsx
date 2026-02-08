@@ -7,7 +7,7 @@ import Notification, { NotificationType } from './components/Notification';
 import ConfirmDialog from './components/ConfirmDialog';
 import AuditLogViewer from './components/AuditLogViewer';
 import { db, calculateTier, supabase } from './services/supabase';
-import { Customer, SortOption, TierFilter, REFERRAL_BONUS_POINTS } from './types';
+import { Customer, SortOption, TierFilter, REFERRAL_BONUS_POINTS, convertPointsToRM, formatRM } from './types';
 
 type Tab = 'dashboard' | 'customers' | 'audit';
 
@@ -38,6 +38,13 @@ const App: React.FC = () => {
   // Sorting and Filtering State
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [tierFilter, setTierFilter] = useState<TierFilter>('All');
+
+  // Redemption Alert State
+  const [redemptionAlert, setRedemptionAlert] = useState<{
+    show: boolean;
+    totalPoints: number;
+    totalRM: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchCustomers();
@@ -163,13 +170,47 @@ const App: React.FC = () => {
         setCustomers(prev => prev.map(c => c.id === id ? updated : c));
         const action = amount > 0 ? 'added' : 'redeemed';
         const absAmount = Math.abs(amount);
-        showNotification('success', 'Points Updated', `${absAmount} points ${action} successfully.`);
+
+        // Show RM value for redemptions
+        const message = amount < 0
+          ? `${absAmount} points redeemed successfully (${formatRM(convertPointsToRM(absAmount))})`
+          : `${absAmount} points ${action} successfully.`;
+
+        showNotification('success', 'Points Updated', message);
+
+        // Check redemption threshold after redemptions
+        if (amount < 0) {
+          checkRedemptionThreshold();
+        }
       } else {
         throw new Error('Failed to update points');
       }
-    } catch (error) {
-      showNotification('error', 'Update Failed', 'Could not update points. Please try again.');
+    } catch (error: any) {
       console.error('Error updating points:', error);
+
+      // Handle specific error types
+      if (error.message?.includes('INVALID_REDEMPTION_INCREMENT')) {
+        showNotification('error', 'Invalid Redemption', 'Redemption must be in multiples of 500 points.');
+      } else if (error.message?.includes('INSUFFICIENT_POINTS')) {
+        showNotification('error', 'Insufficient Points', 'Customer does not have enough points for this redemption.');
+      } else {
+        showNotification('error', 'Update Failed', 'Could not update points. Please try again.');
+      }
+    }
+  };
+
+  const checkRedemptionThreshold = async () => {
+    try {
+      const result = await db.checkRedemptionThreshold();
+      if (result.exceeded && !redemptionAlert?.show) {
+        setRedemptionAlert({
+          show: true,
+          totalPoints: result.totalPoints,
+          totalRM: result.totalRM
+        });
+      }
+    } catch (error) {
+      console.error('Failed to check redemption threshold:', error);
     }
   };
 
@@ -256,7 +297,38 @@ const App: React.FC = () => {
 
   const renderDashboard = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Redemption Alert Banner */}
+      {redemptionAlert?.show && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-2xl shadow-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-800">Redemption Alert</h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  Daily redemption threshold reached: <span className="font-bold">{redemptionAlert.totalPoints.toLocaleString()} points</span> redeemed today
+                  ({formatRM(redemptionAlert.totalRM)} in discounts given)
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setRedemptionAlert(null)}
+              className="flex-shrink-0 p-1 hover:bg-amber-100 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Dashboard Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <p className="text-slate-500 text-sm font-medium">Total Customers</p>
           <h4 className="text-3xl font-bold text-slate-800 mt-2">{stats.totalCustomers}</h4>
@@ -267,7 +339,16 @@ const App: React.FC = () => {
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <p className="text-slate-500 text-sm font-medium">Total Points Redeemed</p>
-          <h4 className="text-3xl font-bold text-slate-800 mt-2">{stats.totalRedeemed.toLocaleString()}</h4>
+          <h4 className="text-3xl font-bold text-rose-600 mt-2">{stats.totalRedeemed.toLocaleString()}</h4>
+        </div>
+        <div className="bg-white p-6 rounded-3xl shadow-sm border-2 border-amber-100 bg-gradient-to-br from-amber-50 to-white">
+          <p className="text-slate-500 text-sm font-medium">Discount Value Given</p>
+          <h4 className="text-3xl font-bold text-amber-600 mt-2">
+            {formatRM(convertPointsToRM(stats.totalRedeemed))}
+          </h4>
+          <p className="text-xs text-slate-400 mt-1">
+            {Math.floor(stats.totalRedeemed / 500)} redemptions
+          </p>
         </div>
       </div>
 
