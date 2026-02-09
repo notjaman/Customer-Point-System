@@ -8,6 +8,9 @@ import ConfirmDialog from './components/ConfirmDialog';
 import AuditLogViewer from './components/AuditLogViewer';
 import { db, calculateTier, supabase } from './services/supabase';
 import { Customer, SortOption, TierFilter, REFERRAL_BONUS_POINTS, convertPointsToRM, formatRM } from './types';
+import { findReferrer } from './utils/helpers';
+import { TOP_MEMBERS_COUNT, TIER_STYLES, TIER_RANKING_COLORS } from './utils/constants';
+import { SearchIcon, RefreshIcon, PlusIcon } from './components/shared/icons';
 
 type Tab = 'dashboard' | 'customers' | 'audit';
 
@@ -57,10 +60,6 @@ const App: React.FC = () => {
   const hideNotification = () => {
     setNotification(null);
   };
-
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
 
   const fetchCustomers = async () => {
     try {
@@ -112,37 +111,13 @@ const App: React.FC = () => {
         if (referralDetails && (referralDetails.name || referralDetails.phone)) {
           console.log('Processing referral for new customer:', name, referralDetails);
 
-          let referrer: Customer | undefined;
-
-          // 1. Prioritize matching BOTH name and phone for accuracy
-          if (referralDetails.name && referralDetails.phone) {
-            const cleanPhone = referralDetails.phone.replace(/[\s\-]/g, '');
-            referrer = customers.find(c =>
-              c.name.toLowerCase() === referralDetails.name!.toLowerCase() &&
-              c.phone.replace(/[\s\-]/g, '') === cleanPhone
-            );
-          }
-
-          // 2. If not found and name is provided, try matching name (case-insensitive)
-          if (!referrer && referralDetails.name) {
-            referrer = customers.find(c =>
-              c.name.toLowerCase() === referralDetails.name!.toLowerCase()
-            );
-          }
-
-          // 3. If still not found and phone is provided, try matching phone
-          if (!referrer && referralDetails.phone) {
-            const cleanPhone = referralDetails.phone.replace(/[\s\-]/g, '');
-            referrer = customers.find(c =>
-              c.phone.replace(/[\s\-]/g, '') === cleanPhone
-            );
-          }
+          const referrer = findReferrer(customers, referralDetails);
 
           if (referrer) {
             console.log('Referrer found:', referrer.name, 'Adding points:', REFERRAL_BONUS_POINTS);
             const updatedReferrer = await db.updatePoints(referrer.id, REFERRAL_BONUS_POINTS);
             if (updatedReferrer) {
-              setCustomers(prev => prev.map(c => c.id === referrer!.id ? updatedReferrer : c));
+              setCustomers(prev => prev.map(c => c.id === referrer.id ? updatedReferrer : c));
               showNotification('success', 'Referral Bonus Applied', `50 points added to ${referrer.name} for referring ${name}.`);
             }
           } else {
@@ -356,24 +331,26 @@ const App: React.FC = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 min-w-0">
           <h3 className="text-lg font-bold text-slate-800 mb-6">Top Members</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...customers].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 6).map((c, i) => (
-              <div key={c.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-400' : 'bg-indigo-400'
-                    }`}>
-                    {i + 1}
+            {[...customers].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, TOP_MEMBERS_COUNT).map((c, i) => {
+              const bgColor = i <= 2 ? TIER_RANKING_COLORS[i as 0 | 1 | 2] : TIER_RANKING_COLORS.default;
+              return (
+                <div key={c.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${bgColor}`}>
+                      {i + 1}
+                    </div>
+                    <div className="truncate">
+                      <p className="font-bold text-slate-800 truncate">{c.name}</p>
+                      <p className="text-xs text-slate-500">{c.phone}</p>
+                    </div>
                   </div>
-                  <div className="truncate">
-                    <p className="font-bold text-slate-800 truncate">{c.name}</p>
-                    <p className="text-xs text-slate-500">{c.phone}</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-indigo-600">{(c.points || 0).toLocaleString()}</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Pts</p>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-indigo-600">{(c.points || 0).toLocaleString()}</p>
-                  <p className="text-[10px] uppercase font-bold text-slate-400">Pts</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -396,7 +373,7 @@ const App: React.FC = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
             placeholder="Search by name or phone..."
@@ -412,16 +389,14 @@ const App: React.FC = () => {
             className="px-4 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50"
             title="Refresh List"
           >
-            <svg className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden md:inline">Refresh</span>
           </button>
           <button
             onClick={() => { setEditingCustomer(null); setIsFormOpen(true); }}
             className="flex-1 md:flex-none px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            <PlusIcon className="w-5 h-5" />
             Add Customer
           </button>
         </div>
@@ -501,9 +476,7 @@ const App: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 hidden md:table-cell">
-                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${calculateTier(c.points || 0) === 'platinum' ? 'bg-indigo-100 text-indigo-700' :
-                      calculateTier(c.points || 0) === 'gold' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
+                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${TIER_STYLES[calculateTier(c.points || 0)]}`}>
                       {(c.tier || calculateTier(c.points || 0)).charAt(0).toUpperCase() + (c.tier || calculateTier(c.points || 0)).slice(1)}
                     </span>
                   </td>

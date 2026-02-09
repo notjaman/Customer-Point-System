@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AuditLog, convertPointsToRM, formatRM } from '../types';
 import { db } from '../services/supabase';
+import { ACTION_TYPE_COLORS } from '../utils/constants';
+import { SearchIcon, RefreshIcon } from './shared/icons';
 
 interface AuditLogViewerProps {
   customerId?: string;
@@ -64,20 +66,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
   };
 
   const getActionColor = (actionType: AuditLog['action_type']) => {
-    switch (actionType) {
-      case 'customer_created':
-        return 'text-green-600';
-      case 'customer_updated':
-        return 'text-blue-600';
-      case 'customer_deleted':
-        return 'text-red-600';
-      case 'points_added':
-        return 'text-green-600';
-      case 'points_redeemed':
-        return 'text-orange-600';
-      default:
-        return 'text-gray-600';
-    }
+    return ACTION_TYPE_COLORS[actionType] || 'text-gray-600';
   };
 
   const formatActionType = (actionType: AuditLog['action_type']) => {
@@ -128,19 +117,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
         </h3>
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search by name or action..."
@@ -153,19 +130,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({
             onClick={loadAuditLogs}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors whitespace-nowrap"
           >
-            <svg
-              className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Customer } from '../types';
+import { formatMalaysianPhone } from '../utils/formatters';
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -58,18 +59,7 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onClose }
   }, [customer]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-
-    // Always ensure it starts with +60
-    if (!value.startsWith('+60')) {
-      value = '+60 ' + value.replace(/^\+?60?\s*/, '');
-    }
-
-    // Prevent deletion of +60 prefix
-    if (value.length < 4) {
-      value = '+60 ';
-    }
-
+    const value = formatMalaysianPhone(e.target.value);
     setPhone(value);
 
     // Clear error when user starts typing
@@ -297,12 +287,7 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onClose }
                     <input
                       type="tel"
                       value={referralPhone}
-                      onChange={(e) => {
-                        let val = e.target.value;
-                        if (!val.startsWith('+60')) val = '+60 ' + val.replace(/^\+?60?\s*/, '');
-                        if (val.length < 4) val = '+60 ';
-                        setReferralPhone(val);
-                      }}
+                      onChange={(e) => setReferralPhone(formatMalaysianPhone(e.target.value))}
                       className="w-full px-4 py-2 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                       placeholder="Referrer's Phone (e.g. +60 12...)"
                     />

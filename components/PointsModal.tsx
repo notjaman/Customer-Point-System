@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Customer, POINTS_PER_REDEMPTION, convertPointsToRM, formatRM, isValidRedemption } from '../types';
+import { QUICK_REDEMPTION_AMOUNTS } from '../utils/constants';
 
 interface PointsModalProps {
   customer: Customer;
@@ -99,7 +100,7 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
               <p className="text-xs font-bold text-amber-800 uppercase tracking-widest mb-3">Quick Redeem</p>
               <div className="grid grid-cols-3 gap-2">
-                {[500, 1000, 1500].map((points) => (
+                {QUICK_REDEMPTION_AMOUNTS.map((points) => (
                   <button
                     key={points}
                     type="button"
