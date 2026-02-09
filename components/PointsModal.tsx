@@ -106,8 +106,8 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
                     onClick={() => handleQuickRedeem(points)}
                     disabled={customer.points < points}
                     className={`py-3 px-2 rounded-xl text-xs font-bold transition-all ${customer.points >= points
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md hover:shadow-lg'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md hover:shadow-lg'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                       }`}
                   >
                     {points} pts
@@ -125,7 +125,7 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
                 autoFocus
                 required
                 type="number"
-                min="1"
+                min={type === 'subtract' ? POINTS_PER_REDEMPTION : 1}
                 step={type === 'subtract' ? POINTS_PER_REDEMPTION : 1}
                 value={amount || ''}
                 onChange={(e) => handleAmountChange(Number(e.target.value))}
@@ -169,10 +169,10 @@ const PointsModal: React.FC<PointsModalProps> = ({ customer, onUpdate, onClose }
               type="submit"
               disabled={amount <= 0 || isSubmitting || (type === 'subtract' && (!isValidRedemption(amount) || customer.points < amount))}
               className={`w-full py-5 font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-xl active:scale-[0.98] ${amount <= 0 || isSubmitting || (type === 'subtract' && (!isValidRedemption(amount) || customer.points < amount))
-                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  : type === 'add'
-                    ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 text-white'
-                    : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white'
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : type === 'add'
+                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 text-white'
+                  : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white'
                 }`}
             >
               {isSubmitting ? (
